@@ -1,0 +1,20 @@
+[settings]
+ethernetiptool_path = "C:/cibest/cgdx_simulator/EtherNetIpTool.v2.4.0/EtherNetIPTool.exe"
+target_ip = "172.24.1.53"
+
+[train_information]
+Tcs_ITcmsIsAlive = 1
+Bbr_IGlobalPosLat = 48.584743
+Bbr_IGlobalPosLong = 7.787015
+Bbr_IGlobalPosAlt = 1
+Bbr_ITrainSpeed = 0
+Tcs_CReadTrainsetNum = 6006
+Tcs_ILocalUnitNumCip = 0
+Omc_ILeadingCabTrain = "4 : Ve2 activated (Bit 2)"
+
+[train_composition]
+Tcs_IC1TrainsetNum = 6006
+Tcs_IC2TrainsetNum = 0
+Idf_IC1NumOfCars = 4
+Idf_IC2NumOfCars = 0
+Cpl_ICnstDirLead = 1

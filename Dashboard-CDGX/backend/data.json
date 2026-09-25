@@ -1,0 +1,182 @@
+[
+  {
+    "id": 1,
+    "ip": "10.136.115.60",
+    "name": "Camera 1",
+    "reachable": "false",
+    "rtt_ms": null,
+    "ttl": null,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": "Timeout"
+  },
+  {
+    "id": 10,
+    "ip": "10.136.115.69",
+    "name": "Camera 10",
+    "reachable": "false",
+    "rtt_ms": null,
+    "ttl": null,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": "Timeout"
+  },
+  {
+    "id": 11,
+    "ip": "10.136.115.70",
+    "name": "Camera 11",
+    "reachable": "true",
+    "rtt_ms": 58,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 12,
+    "ip": "10.136.115.71",
+    "name": "Camera 12",
+    "reachable": "true",
+    "rtt_ms": 24,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 13,
+    "ip": "10.136.115.72",
+    "name": "Camera 13",
+    "reachable": "true",
+    "rtt_ms": 58,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 14,
+    "ip": "10.136.115.73",
+    "name": "Camera 14",
+    "reachable": "true",
+    "rtt_ms": 58,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 15,
+    "ip": "10.136.115.74",
+    "name": "Camera 15",
+    "reachable": "true",
+    "rtt_ms": 45,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 16,
+    "ip": "10.136.115.75",
+    "name": "Camera 16",
+    "reachable": "true",
+    "rtt_ms": 28,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 2,
+    "ip": "10.136.115.61",
+    "name": "Camera 2",
+    "reachable": "true",
+    "rtt_ms": 59,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 3,
+    "ip": "10.136.115.62",
+    "name": "Camera 3",
+    "reachable": "true",
+    "rtt_ms": 24,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 4,
+    "ip": "10.136.115.63",
+    "name": "Camera 4",
+    "reachable": "true",
+    "rtt_ms": 18,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 5,
+    "ip": "10.136.115.64",
+    "name": "Camera 5",
+    "reachable": "false",
+    "rtt_ms": null,
+    "ttl": null,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": "Timeout"
+  },
+  {
+    "id": 6,
+    "ip": "10.136.115.65",
+    "name": "Camera 6",
+    "reachable": "true",
+    "rtt_ms": 38,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 7,
+    "ip": "10.136.115.66",
+    "name": "Camera 7",
+    "reachable": "true",
+    "rtt_ms": 31,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 8,
+    "ip": "10.136.115.67",
+    "name": "Camera 8",
+    "reachable": "true",
+    "rtt_ms": 161,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 9,
+    "ip": "10.136.115.68",
+    "name": "Camera 9",
+    "reachable": "true",
+    "rtt_ms": 69,
+    "ttl": 62,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 17,
+    "ip": "10.136.115.96",
+    "name": "MDR6",
+    "reachable": "true",
+    "rtt_ms": 38,
+    "ttl": 126,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": null
+  },
+  {
+    "id": 18,
+    "ip": "10.136.115.100",
+    "name": "Serveur IA",
+    "reachable": "false",
+    "rtt_ms": null,
+    "ttl": null,
+    "timestamp": "2025-09-30T09:09:42.103Z",
+    "error": "Timeout"
+  }
+]
