@@ -3,7 +3,7 @@ version: '3.8'
 services:
   db:
     image: postgres:15
-    container_name: cdgxpress_db
+    container_name: cdgxpress_db_v2
     environment:
       POSTGRES_USER: cdgxpress_user
       POSTGRES_PASSWORD: password
@@ -21,7 +21,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: cdgxpress_backend
+    container_name: cdgxpress_backend_v2
     depends_on:
       db:
         condition: service_healthy
@@ -39,7 +39,7 @@ services:
 
   pinger:
     build: ./pinger
-    container_name: cdgxpress_pinger
+    container_name: cdgxpress_pinger_v2
     depends_on:
       db:
         condition: service_healthy
