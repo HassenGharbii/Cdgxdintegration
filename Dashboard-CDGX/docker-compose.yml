@@ -52,6 +52,26 @@ services:
       PING_INTERVAL: 300
     restart: unless-stopped
 
+  alarms-poller:
+    build: ./alarms-poller
+    container_name: cdgxpress_alarms_poller_v2
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: db
+      POSTGRES_USER: cdgxpress_user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: cdgxpress
+      POSTGRES_PORT: 5432
+      ALARM_POLL_INTERVAL: 15
+      # Set to false once the real XProtect server + credentials are known.
+      XPROTECT_SIMULATE: ${XPROTECT_SIMULATE:-true}
+      XPROTECT_BASE_URL: ${XPROTECT_BASE_URL:-https://xprotect.local}
+      XPROTECT_USERNAME: ${XPROTECT_USERNAME:-}
+      XPROTECT_PASSWORD: ${XPROTECT_PASSWORD:-}
+    restart: unless-stopped
+
   frontend:
     build:
       context: ./frontend

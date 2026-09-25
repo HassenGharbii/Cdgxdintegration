@@ -11,6 +11,7 @@ import {
   faCarSide,
   faTriangleExclamation,
   faFileExport,
+  faBell,
   faChevronLeft,
   faChevronRight,
   faChevronDown,
@@ -19,6 +20,7 @@ import {
 const NAV_ITEMS = [
   // { key: 'dashboard', label: 'Dashboard', icon: faHouse, path: '/dashboard' },
   { key: 'equipements', label: 'Équipements', icon: faNetworkWired, path: '/cibest' },
+  { key: 'alarms', label: 'Alarmes', icon: faBell, path: '/alarms' },
   {
     key: 'comptage-passagers',
     label: 'Comptage passagers',

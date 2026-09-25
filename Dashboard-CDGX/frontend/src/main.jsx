@@ -7,6 +7,7 @@ import Cibest from './pages/Cibest'
 import Dashboard from './pages/Dashboard'
 import LoginPage from './pages/LoginPage'
 import AdminPanel from './pages/AdminPanel'
+import Alarms from './pages/Alarms'
 import VueEnsemble from './pages/comptage-passagers/VueEnsemble'
 import AnalyseCamera from './pages/comptage-passagers/AnalyseCamera'
 import Groupes from './pages/comptage-passagers/Groupes'
@@ -29,6 +30,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
           <Route path="/" element={<Navigate to="/cibest" replace />} />
           {/* <Route path="/dashboard" element={<Dashboard />} /> */}
           <Route path="/cibest" element={<Cibest />} />
+          <Route path="/alarms" element={<Alarms />} />
           <Route path="/comptage-passagers/vue-ensemble" element={<VueEnsemble />} />
           <Route path="/comptage-passagers/analyse-camera" element={<AnalyseCamera />} />
           <Route path="/comptage-passagers/groupes" element={<Groupes />} />

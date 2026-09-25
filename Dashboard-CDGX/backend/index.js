@@ -477,6 +477,71 @@ app.get('/api/comptage-passagers/instances/:id/stream', (req, res) => {
   req.on('close', () => upstream.destroy());
 });
 
+// ─── Alarms (Milestone XProtect, via the alarms-poller service) ──────────────
+// camera_alarms is populated by alarms-poller/xprotect_alarms.py and matched
+// to the equipements inventory by IP.
+
+app.get('/api/alarms', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT ca.*, e.type AS equipment_type, e.location
+      FROM camera_alarms ca
+      LEFT JOIN equipements e ON e.ip = ca.ip
+      ORDER BY ca.triggered_at DESC
+      LIMIT 200
+    `);
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    logger.error({ err });
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+app.get('/api/alarms/summary', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT
+        COUNT(*) FILTER (WHERE state != 'Closed') AS active,
+        COUNT(*) FILTER (WHERE state != 'Closed' AND priority ILIKE 'critique%') AS critical,
+        COUNT(DISTINCT ip) FILTER (WHERE state != 'Closed' AND ip IS NOT NULL) AS cameras_affected,
+        COUNT(*) FILTER (WHERE triggered_at >= NOW() - INTERVAL '24 hours') AS last_24h
+      FROM camera_alarms
+    `);
+    res.json({ success: true, summary: result.rows[0] });
+  } catch (err) {
+    logger.error({ err });
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+app.get('/api/alarms/by-ip/:ip', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM camera_alarms WHERE ip = $1 ORDER BY triggered_at DESC',
+      [req.params.ip]
+    );
+    res.json({ success: true, data: result.rows });
+  } catch (err) {
+    logger.error({ err });
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+app.post('/api/alarms/:id/ack', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `UPDATE camera_alarms SET state = 'Acknowledged', acknowledged_at = NOW(), acknowledged_by = $1
+       WHERE id = $2 RETURNING *`,
+      [req.user.username, req.params.id]
+    );
+    if (result.rowCount === 0) return res.status(404).json({ success: false, error: 'Alarme introuvable' });
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    logger.error({ err });
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
 // ─── Public API Routes ────────────────────────────────────────────────────────
 
 app.get('/api/cibest/equipements', async (req, res) => {
