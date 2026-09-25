@@ -20,8 +20,8 @@ const port = process.env.PORT || 3000;
 const host = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'cibest_secret_key_change_in_production';
 
-// tx2 (the passenger-counting FastAPI service, hosted on the Jetson)
-const TX2_API_URL = (process.env.TX2_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+// tx2 (the passenger-counting FastAPI service, "Serveur IA")
+const TX2_API_URL = (process.env.TX2_API_URL || 'http://10.136.115.100:8000').replace(/\/$/, '');
 
 // CORS — origines autorisees configurables via ALLOWED_ORIGINS (CSV)
 const allowedOrigins = process.env.ALLOWED_ORIGINS
