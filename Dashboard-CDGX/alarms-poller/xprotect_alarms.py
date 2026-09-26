@@ -109,52 +109,66 @@ class XProtectClient:
             self._authenticate()
         return {'Authorization': f'Bearer {self._token}'}
 
-    def get_cameras(self):
-        """Returns {camera_id: {"ip": ..., "name": ...}}. Field names/shape
-        (hardware.address containing the IP) match the standard XProtect
-        Configuration API — verify against the real server."""
-        url = f'{XPROTECT_BASE_URL}{XPROTECT_CAMERAS_PATH}'
+    def _get_array(self, path, debug_chars=500):
+        """This server wraps every list response as {"array": [...]}."""
+        url = f'{XPROTECT_BASE_URL}{path}'
         resp = requests.get(url, headers=self._headers(), verify=XPROTECT_VERIFY_SSL, timeout=10)
         if ALARM_DEBUG:
-            print(f"[DEBUG] GET {url} -> {resp.status_code}: {resp.text[:500]}")
+            print(f"[DEBUG] GET {url} -> {resp.status_code}: {resp.text[:debug_chars]}")
         resp.raise_for_status()
-        body = resp.json()
-        cameras = {}
-        for cam in body.get('data', body.get('Cameras', [])):
-            address = cam.get('address') or cam.get('hardware', {}).get('address', '')
+        return resp.json().get('array', [])
+
+    def get_hardware(self):
+        """{hardware_id: ip}. Hardware objects carry the device address; a
+        camera references one via hardwareId (or similar) — confirm the
+        exact linking field once we see a full camera object."""
+        hardware = {}
+        for hw in self._get_array('/api/rest/v1/hardware', debug_chars=1500):
+            address = hw.get('address', '')
             ip_match = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', address)
+            if ip_match:
+                hardware[hw.get('id')] = ip_match.group(0)
+        return hardware
+
+    def get_cameras(self):
+        """Returns {camera_id: {"ip": ..., "name": ...}}."""
+        hardware_ips = self.get_hardware()
+        cameras = {}
+        for cam in self._get_array(XPROTECT_CAMERAS_PATH, debug_chars=1500):
+            hardware_id = cam.get('hardwareId') or cam.get('recorderId') or cam.get('parentId')
             cameras[cam.get('id')] = {
-                'ip': ip_match.group(0) if ip_match else None,
+                'ip': hardware_ips.get(hardware_id),
                 'name': cam.get('name') or cam.get('displayName'),
             }
         return cameras
 
     def get_alarms(self):
-        url = f'{XPROTECT_BASE_URL}{XPROTECT_ALARMS_PATH}'
-        resp = requests.get(url, headers=self._headers(), verify=XPROTECT_VERIFY_SSL, timeout=10)
-        if ALARM_DEBUG:
-            print(f"[DEBUG] GET {url} -> {resp.status_code}: {resp.text[:500]}")
-        resp.raise_for_status()
-        body = resp.json()
-        return body.get('data', body.get('Alarms', []))
+        return self._get_array(XPROTECT_ALARMS_PATH)
 
 
 def _map_alarm(raw_alarm, camera_lookup):
-    source_id = raw_alarm.get('sourceId') or raw_alarm.get('deviceId')
+    # source looks like "cameras/<guid>" — the part after the slash is the camera id.
+    source = raw_alarm.get('source') or ''
+    source_id = source.split('/')[-1] if '/' in source else source
     camera = camera_lookup.get(source_id, {})
-    triggered_raw = raw_alarm.get('timeCreated') or raw_alarm.get('eventTime')
+
+    priority = raw_alarm.get('priority') or {}
+    state = raw_alarm.get('state') or {}
+
+    triggered_raw = raw_alarm.get('time') or raw_alarm.get('lastUpdatedTime')
     try:
         triggered_at = datetime.fromisoformat(triggered_raw.replace('Z', '+00:00')) if triggered_raw else datetime.now()
     except ValueError:
         triggered_at = datetime.now()
+
     return {
-        'source_alarm_id': str(raw_alarm.get('id') or raw_alarm.get('alarmId')),
+        'source_alarm_id': str(raw_alarm.get('id')),
         'ip': camera.get('ip'),
-        'camera_name': camera.get('name') or raw_alarm.get('name'),
-        'alarm_type': raw_alarm.get('category') or raw_alarm.get('listName') or raw_alarm.get('name'),
+        'camera_name': camera.get('name'),
+        'alarm_type': raw_alarm.get('category') or raw_alarm.get('name'),
         'message': raw_alarm.get('message') or raw_alarm.get('name'),
-        'priority': str(raw_alarm.get('priority', '')),
-        'state': raw_alarm.get('state', 'New'),
+        'priority': priority.get('name', ''),
+        'state': state.get('name', 'New'),
         'triggered_at': triggered_at,
         'raw': psycopg2.extras.Json(raw_alarm),
     }

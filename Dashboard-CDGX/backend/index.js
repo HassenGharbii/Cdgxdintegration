@@ -542,7 +542,7 @@ app.get('/api/alarms/summary', async (req, res) => {
     const result = await pool.query(`
       SELECT
         COUNT(*) FILTER (WHERE state != 'Closed') AS active,
-        COUNT(*) FILTER (WHERE state != 'Closed' AND priority ILIKE 'critique%') AS critical,
+        COUNT(*) FILTER (WHERE state != 'Closed' AND (priority ILIKE 'critique%' OR priority ILIKE 'high%' OR priority ILIKE 'critical%')) AS critical,
         COUNT(DISTINCT ip) FILTER (WHERE state != 'Closed' AND ip IS NOT NULL) AS cameras_affected,
         COUNT(*) FILTER (WHERE triggered_at >= NOW() - INTERVAL '24 hours') AS last_24h
       FROM camera_alarms

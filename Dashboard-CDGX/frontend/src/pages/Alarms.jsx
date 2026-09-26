@@ -26,8 +26,8 @@ const authHeaders = () => {
 
 const priorityColor = (t, priority) => {
   const p = (priority || '').toLowerCase();
-  if (p.startsWith('crit')) return t.criticalText;
-  if (p.startsWith('moy')) return t.warningText;
+  if (p.startsWith('crit') || p.startsWith('high')) return t.criticalText;
+  if (p.startsWith('moy') || p.startsWith('medium')) return t.warningText;
   return t.inkMuted;
 };
 
