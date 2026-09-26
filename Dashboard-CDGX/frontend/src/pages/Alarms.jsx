@@ -20,8 +20,8 @@ const authHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const priorityColor = (t, priority = '') => {
-  const p = priority.toLowerCase();
+const priorityColor = (t, priority) => {
+  const p = (priority || '').toLowerCase();
   if (p.startsWith('crit')) return t.criticalText;
   if (p.startsWith('moy')) return t.warningText;
   return t.inkMuted;
