@@ -65,6 +65,9 @@ services:
       POSTGRES_DB: cdgxpress
       POSTGRES_PORT: 5432
       ALARM_POLL_INTERVAL: 15
+      # Verbose per-cycle + raw API logging while we validate the XProtect
+      # endpoint shape — set to false once it's confirmed working.
+      ALARM_DEBUG: ${ALARM_DEBUG:-true}
       # Set to false once the real XProtect server + credentials are known.
       XPROTECT_SIMULATE: ${XPROTECT_SIMULATE:-true}
       XPROTECT_BASE_URL: ${XPROTECT_BASE_URL:-https://xprotect.local}

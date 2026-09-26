@@ -45,6 +45,7 @@ XPROTECT_VERIFY_SSL = os.getenv('XPROTECT_VERIFY_SSL', 'false').lower() == 'true
 
 POLL_INTERVAL = int(os.getenv('ALARM_POLL_INTERVAL', '15'))
 CAMERA_CACHE_REFRESH_CYCLES = 20  # re-resolve camera->IP mapping every N cycles
+ALARM_DEBUG = os.getenv('ALARM_DEBUG', 'true').lower() == 'true'  # verbose per-cycle/raw logging
 
 
 def connect_with_retry():
@@ -96,6 +97,8 @@ class XProtectClient:
             verify=XPROTECT_VERIFY_SSL,
             timeout=10,
         )
+        if ALARM_DEBUG:
+            print(f"[DEBUG] POST {XPROTECT_TOKEN_URL} -> {resp.status_code}: {resp.text[:300]}")
         resp.raise_for_status()
         data = resp.json()
         self._token = data['access_token']
@@ -110,11 +113,14 @@ class XProtectClient:
         """Returns {camera_id: {"ip": ..., "name": ...}}. Field names/shape
         (hardware.address containing the IP) match the standard XProtect
         Configuration API — verify against the real server."""
-        resp = requests.get(f'{XPROTECT_BASE_URL}{XPROTECT_CAMERAS_PATH}', headers=self._headers(),
-                             verify=XPROTECT_VERIFY_SSL, timeout=10)
+        url = f'{XPROTECT_BASE_URL}{XPROTECT_CAMERAS_PATH}'
+        resp = requests.get(url, headers=self._headers(), verify=XPROTECT_VERIFY_SSL, timeout=10)
+        if ALARM_DEBUG:
+            print(f"[DEBUG] GET {url} -> {resp.status_code}: {resp.text[:500]}")
         resp.raise_for_status()
+        body = resp.json()
         cameras = {}
-        for cam in resp.json().get('data', resp.json().get('Cameras', [])):
+        for cam in body.get('data', body.get('Cameras', [])):
             address = cam.get('address') or cam.get('hardware', {}).get('address', '')
             ip_match = re.search(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}', address)
             cameras[cam.get('id')] = {
@@ -124,10 +130,13 @@ class XProtectClient:
         return cameras
 
     def get_alarms(self):
-        resp = requests.get(f'{XPROTECT_BASE_URL}{XPROTECT_ALARMS_PATH}', headers=self._headers(),
-                             verify=XPROTECT_VERIFY_SSL, timeout=10)
+        url = f'{XPROTECT_BASE_URL}{XPROTECT_ALARMS_PATH}'
+        resp = requests.get(url, headers=self._headers(), verify=XPROTECT_VERIFY_SSL, timeout=10)
+        if ALARM_DEBUG:
+            print(f"[DEBUG] GET {url} -> {resp.status_code}: {resp.text[:500]}")
         resp.raise_for_status()
-        return resp.json().get('data', resp.json().get('Alarms', []))
+        body = resp.json()
+        return body.get('data', body.get('Alarms', []))
 
 
 def _map_alarm(raw_alarm, camera_lookup):
@@ -152,8 +161,9 @@ def _map_alarm(raw_alarm, camera_lookup):
 
 
 def run_real_cycle(client, camera_cache):
-    alarms = [_map_alarm(a, camera_cache) for a in client.get_alarms()]
-    return alarms
+    raw_alarms = client.get_alarms()
+    print(f"XProtect: {len(camera_cache)} cameras cached, {len(raw_alarms)} alarm(s) returned this cycle.")
+    return [_map_alarm(a, camera_cache) for a in raw_alarms]
 
 
 # ─── Simulation mode (no XProtect server needed) ──────────────────────────
@@ -243,7 +253,11 @@ def main():
                 print("Perte de connexion DB, reconnexion...")
                 conn = connect_with_retry()
             except requests.RequestException as e:
-                print(f"Erreur XProtect: {e}")
+                print(f"Erreur XProtect (reseau/HTTP): {e}")
+            except Exception as e:  # noqa: BLE001 - keep the poller alive, surface unexpected shapes/fields
+                import traceback
+                print(f"Erreur inattendue dans le cycle (probablement un champ/chemin d'API a ajuster): {e}")
+                traceback.print_exc()
             cycle += 1
             time.sleep(POLL_INTERVAL)
     except KeyboardInterrupt:
