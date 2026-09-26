@@ -47,6 +47,14 @@ POLL_INTERVAL = int(os.getenv('ALARM_POLL_INTERVAL', '15'))
 CAMERA_CACHE_REFRESH_CYCLES = 20  # re-resolve camera->IP mapping every N cycles
 ALARM_DEBUG = os.getenv('ALARM_DEBUG', 'true').lower() == 'true'  # verbose per-cycle/raw logging
 
+# The server appears to page list responses (observed cap ~100 items) even
+# though {"array": [...]} carries no visible pagination metadata. Milestone's
+# REST API uses OData-style ?skip=&top= for paging — page through until a
+# short page comes back. MAX_PAGES is a safety net in case paging params
+# are silently ignored (would otherwise loop forever re-fetching page 1).
+XPROTECT_PAGE_SIZE = int(os.getenv('XPROTECT_PAGE_SIZE', '100'))
+XPROTECT_MAX_PAGES = int(os.getenv('XPROTECT_MAX_PAGES', '50'))
+
 
 def connect_with_retry():
     while True:
@@ -110,13 +118,29 @@ class XProtectClient:
         return {'Authorization': f'Bearer {self._token}'}
 
     def _get_array(self, path, debug_chars=500):
-        """This server wraps every list response as {"array": [...]}."""
+        """This server wraps every list response as {"array": [...]} and
+        appears to cap each response at ~100 items. Pages through with
+        OData-style ?skip=&top= (Milestone's documented convention) until a
+        short page comes back, capped at XPROTECT_MAX_PAGES as a safety net
+        in case those params turn out to be ignored."""
         url = f'{XPROTECT_BASE_URL}{path}'
-        resp = requests.get(url, headers=self._headers(), verify=XPROTECT_VERIFY_SSL, timeout=10)
-        if ALARM_DEBUG:
-            print(f"[DEBUG] GET {url} -> {resp.status_code}: {resp.text[:debug_chars]}")
-        resp.raise_for_status()
-        return resp.json().get('array', [])
+        sep = '&' if '?' in path else '?'
+        items = []
+        for page in range(XPROTECT_MAX_PAGES):
+            skip = page * XPROTECT_PAGE_SIZE
+            page_url = f'{url}{sep}skip={skip}&top={XPROTECT_PAGE_SIZE}'
+            resp = requests.get(page_url, headers=self._headers(), verify=XPROTECT_VERIFY_SSL, timeout=10)
+            if ALARM_DEBUG:
+                print(f"[DEBUG] GET {page_url} -> {resp.status_code}: {resp.text[:debug_chars]}")
+            resp.raise_for_status()
+            batch = resp.json().get('array', [])
+            items.extend(batch)
+            if len(batch) < XPROTECT_PAGE_SIZE:
+                break
+        else:
+            print(f"[WARN] Hit XPROTECT_MAX_PAGES ({XPROTECT_MAX_PAGES}) paging {path} — "
+                  f"either raise it or the skip/top params aren't being honored (check for duplicate items).")
+        return items
 
     def get_hardware(self):
         """{hardware_id: ip}. Hardware objects carry the device address; a
