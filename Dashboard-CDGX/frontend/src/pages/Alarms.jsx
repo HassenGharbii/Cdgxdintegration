@@ -7,6 +7,7 @@ import {
   faCheck,
   faTriangleExclamation,
   faFilterCircleXmark,
+  faMagnifyingGlass,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { API_URL } from '../config';
@@ -15,7 +16,6 @@ import ChartCard from '../components/dashboard/ChartCard';
 import StatTile from '../components/dashboard/StatTile';
 
 const POLL_MS = 8000;
-const DEBOUNCE_MS = 400;
 
 const EMPTY_FILTERS = { ip: '', camera: '', alarm_type: '', state: '', from: '', to: '' };
 
@@ -32,6 +32,11 @@ const priorityColor = (t, priority) => {
 };
 
 const inputStyle = (t) => ({ borderColor: t.border, background: t.cardSoft, color: t.inkPrimary });
+
+// Browsers render a <select>'s popup list themselves and mostly ignore the
+// select's own background — only the <option>s' own colors reliably apply,
+// so without this a dark theme's light text becomes white-on-white there.
+const optionStyle = { color: '#111827', background: '#ffffff' };
 
 const AlarmRow = ({ alarm, t, onAck }) => {
   const [busy, setBusy] = useState(false);
@@ -92,11 +97,13 @@ const Alarms = () => {
   const [alarms, setAlarms] = useState([]);
   const [summary, setSummary] = useState({ active: 0, critical: 0, cameras_affected: 0, last_24h: 0 });
   const [meta, setMeta] = useState({ alarm_types: [], states: [] });
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [filters, setFilters] = useState(EMPTY_FILTERS); // bound to the inputs, edited freely
+  const [appliedFilters, setAppliedFilters] = useState(EMPTY_FILTERS); // what's actually queried
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
 
   const setFilter = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+  const filtersDirty = JSON.stringify(filters) !== JSON.stringify(appliedFilters);
 
   const refresh = async (activeFilters) => {
     try {
@@ -123,19 +130,22 @@ const Alarms = () => {
     }
   };
 
-  // Debounce free-text filters (ip/camera); dropdowns and dates refetch immediately.
+  // Refetch only when filters are actually applied (button click), plus a
+  // background poll on that same applied set so new alarms still show up
+  // without wiping out whatever the user is mid-typing in the filter form.
   useEffect(() => {
-    const id = setTimeout(() => refresh(filters), DEBOUNCE_MS);
-    return () => clearTimeout(id);
-  }, [filters]);
-
-  // Background poll picks up new alarms without disturbing current filters.
-  useEffect(() => {
-    const id = setInterval(() => refresh(filters), POLL_MS);
+    refresh(appliedFilters);
+    const id = setInterval(() => refresh(appliedFilters), POLL_MS);
     return () => clearInterval(id);
-  }, [filters]);
+  }, [appliedFilters]);
 
-  const hasActiveFilters = Object.values(filters).some(Boolean);
+  const applyFilters = () => setAppliedFilters(filters);
+  const resetFilters = () => {
+    setFilters(EMPTY_FILTERS);
+    setAppliedFilters(EMPTY_FILTERS);
+  };
+
+  const hasActiveFilters = Object.values(appliedFilters).some(Boolean);
 
   return (
     <DashboardShell title="Alarmes" subtitle="Milestone XProtect · alarmes caméras par équipement">
@@ -171,16 +181,26 @@ const Alarms = () => {
                 t={t}
                 className="fade-up-1"
                 action={
-                  hasActiveFilters && (
+                  <div className="flex items-center gap-2">
+                    {hasActiveFilters && (
+                      <button
+                        onClick={resetFilters}
+                        className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+                        style={{ background: t.seriesTrack, color: t.inkSecondary }}
+                      >
+                        <FontAwesomeIcon icon={faFilterCircleXmark} className="text-[10px]" />
+                        Réinitialiser
+                      </button>
+                    )}
                     <button
-                      onClick={() => setFilters(EMPTY_FILTERS)}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold"
-                      style={{ background: t.seriesTrack, color: t.inkSecondary }}
+                      onClick={applyFilters}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1 text-[11px] font-semibold"
+                      style={{ background: t.series, color: '#ffffff' }}
                     >
-                      <FontAwesomeIcon icon={faFilterCircleXmark} className="text-[10px]" />
-                      Réinitialiser
+                      <FontAwesomeIcon icon={faMagnifyingGlass} className="text-[10px]" />
+                      Appliquer
                     </button>
-                  )
+                  </div>
                 }
               >
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -189,6 +209,7 @@ const Alarms = () => {
                     <input
                       value={filters.ip}
                       onChange={setFilter('ip')}
+                      onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
                       placeholder="10.136.115.…"
                       className="rounded-lg border px-3 py-1.5 text-sm"
                       style={inputStyle(t)}
@@ -200,6 +221,7 @@ const Alarms = () => {
                     <input
                       value={filters.camera}
                       onChange={setFilter('camera')}
+                      onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
                       placeholder="Camera 05…"
                       className="rounded-lg border px-3 py-1.5 text-sm"
                       style={inputStyle(t)}
@@ -209,16 +231,16 @@ const Alarms = () => {
                   <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
                     Type d'alarme
                     <select value={filters.alarm_type} onChange={setFilter('alarm_type')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)}>
-                      <option value="">Tous</option>
-                      {meta.alarm_types.map((type) => <option key={type} value={type}>{type}</option>)}
+                      <option value="" style={optionStyle}>Tous</option>
+                      {meta.alarm_types.map((type) => <option key={type} value={type} style={optionStyle}>{type}</option>)}
                     </select>
                   </label>
 
                   <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
                     Statut
                     <select value={filters.state} onChange={setFilter('state')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)}>
-                      <option value="">Tous</option>
-                      {meta.states.map((state) => <option key={state} value={state}>{state}</option>)}
+                      <option value="" style={optionStyle}>Tous</option>
+                      {meta.states.map((state) => <option key={state} value={state} style={optionStyle}>{state}</option>)}
                     </select>
                   </label>
 
@@ -232,6 +254,11 @@ const Alarms = () => {
                     <input type="datetime-local" value={filters.to} onChange={setFilter('to')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)} />
                   </label>
                 </div>
+                {filtersDirty && (
+                  <p className="mt-2 text-[11px]" style={{ color: t.warningText }}>
+                    Filtres modifiés — cliquez sur "Appliquer" pour les prendre en compte.
+                  </p>
+                )}
               </ChartCard>
 
               <ChartCard
@@ -259,7 +286,7 @@ const Alarms = () => {
                       </thead>
                       <tbody>
                         {alarms.map((alarm) => (
-                          <AlarmRow key={alarm.id} alarm={alarm} t={t} onAck={() => refresh(filters)} />
+                          <AlarmRow key={alarm.id} alarm={alarm} t={t} onAck={() => refresh(appliedFilters)} />
                         ))}
                       </tbody>
                     </table>
