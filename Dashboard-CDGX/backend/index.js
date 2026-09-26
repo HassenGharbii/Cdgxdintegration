@@ -481,16 +481,56 @@ app.get('/api/comptage-passagers/instances/:id/stream', (req, res) => {
 // camera_alarms is populated by alarms-poller/xprotect_alarms.py and matched
 // to the equipements inventory by IP.
 
+// GET /api/alarms?ip=&camera=&alarm_type=&state=&priority=&from=&to=&limit=
 app.get('/api/alarms', async (req, res) => {
+  const { ip, camera, alarm_type, state, priority, from, to } = req.query;
+  const limit = Math.min(parseInt(req.query.limit, 10) || 200, 2000);
+
+  const clauses = [];
+  const params = [];
+
+  if (ip) { params.push(`%${ip}%`); clauses.push(`ca.ip ILIKE $${params.length}`); }
+  if (camera) { params.push(`%${camera}%`); clauses.push(`ca.camera_name ILIKE $${params.length}`); }
+  if (alarm_type) { params.push(alarm_type); clauses.push(`ca.alarm_type = $${params.length}`); }
+  if (state) { params.push(state); clauses.push(`ca.state = $${params.length}`); }
+  if (priority) { params.push(priority); clauses.push(`ca.priority = $${params.length}`); }
+  if (from) { params.push(from); clauses.push(`ca.triggered_at >= $${params.length}`); }
+  if (to) { params.push(to); clauses.push(`ca.triggered_at <= $${params.length}`); }
+
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  params.push(limit);
+
   try {
     const result = await pool.query(`
       SELECT ca.*, e.type AS equipment_type, e.location
       FROM camera_alarms ca
       LEFT JOIN equipements e ON e.ip = ca.ip
+      ${where}
       ORDER BY ca.triggered_at DESC
-      LIMIT 200
-    `);
+      LIMIT $${params.length}
+    `, params);
     res.json({ success: true, data: result.rows });
+  } catch (err) {
+    logger.error({ err });
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
+// Distinct values to populate filter dropdowns — reflects whatever data
+// actually exists (real or simulated), not a hardcoded list.
+app.get('/api/alarms/meta', async (req, res) => {
+  try {
+    const [types, states, priorities] = await Promise.all([
+      pool.query('SELECT DISTINCT alarm_type FROM camera_alarms WHERE alarm_type IS NOT NULL ORDER BY alarm_type'),
+      pool.query('SELECT DISTINCT state FROM camera_alarms ORDER BY state'),
+      pool.query('SELECT DISTINCT priority FROM camera_alarms WHERE priority IS NOT NULL AND priority != \'\' ORDER BY priority'),
+    ]);
+    res.json({
+      success: true,
+      alarm_types: types.rows.map(r => r.alarm_type),
+      states: states.rows.map(r => r.state),
+      priorities: priorities.rows.map(r => r.priority),
+    });
   } catch (err) {
     logger.error({ err });
     res.status(500).json({ success: false, error: 'Erreur serveur' });

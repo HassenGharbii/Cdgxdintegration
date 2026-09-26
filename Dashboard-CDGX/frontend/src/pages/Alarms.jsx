@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBell,
@@ -6,6 +6,7 @@ import {
   faVideo,
   faCheck,
   faTriangleExclamation,
+  faFilterCircleXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { API_URL } from '../config';
@@ -14,6 +15,9 @@ import ChartCard from '../components/dashboard/ChartCard';
 import StatTile from '../components/dashboard/StatTile';
 
 const POLL_MS = 8000;
+const DEBOUNCE_MS = 400;
+
+const EMPTY_FILTERS = { ip: '', camera: '', alarm_type: '', state: '', from: '', to: '' };
 
 const authHeaders = () => {
   const token = localStorage.getItem('token');
@@ -26,6 +30,8 @@ const priorityColor = (t, priority) => {
   if (p.startsWith('moy')) return t.warningText;
   return t.inkMuted;
 };
+
+const inputStyle = (t) => ({ borderColor: t.border, background: t.cardSoft, color: t.inkPrimary });
 
 const AlarmRow = ({ alarm, t, onAck }) => {
   const [busy, setBusy] = useState(false);
@@ -85,39 +91,51 @@ const AlarmRow = ({ alarm, t, onAck }) => {
 const Alarms = () => {
   const [alarms, setAlarms] = useState([]);
   const [summary, setSummary] = useState({ active: 0, critical: 0, cameras_affected: 0, last_24h: 0 });
-  const [ipFilter, setIpFilter] = useState('');
+  const [meta, setMeta] = useState({ alarm_types: [], states: [] });
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(null);
 
-  const refresh = async () => {
+  const setFilter = (key) => (e) => setFilters((f) => ({ ...f, [key]: e.target.value }));
+
+  const refresh = async (activeFilters) => {
     try {
-      const [alarmsRes, summaryRes] = await Promise.all([
-        fetch(`${API_URL}/api/alarms`),
+      const params = new URLSearchParams();
+      Object.entries(activeFilters).forEach(([k, v]) => { if (v) params.set(k, v); });
+
+      const [alarmsRes, summaryRes, metaRes] = await Promise.all([
+        fetch(`${API_URL}/api/alarms?${params.toString()}`),
         fetch(`${API_URL}/api/alarms/summary`),
+        fetch(`${API_URL}/api/alarms/meta`),
       ]);
       const alarmsJson = await alarmsRes.json();
       const summaryJson = await summaryRes.json();
+      const metaJson = await metaRes.json();
       if (!alarmsJson.success) throw new Error(alarmsJson.error);
       setAlarms(alarmsJson.data);
       if (summaryJson.success) setSummary(summaryJson.summary);
+      if (metaJson.success) setMeta(metaJson);
       setError(null);
     } catch (err) {
-      setError(err.message || 'Impossible de joindre l\'API');
+      setError(err.message || "Impossible de joindre l'API");
     } finally {
       setLoaded(true);
     }
   };
 
+  // Debounce free-text filters (ip/camera); dropdowns and dates refetch immediately.
   useEffect(() => {
-    refresh();
-    const id = setInterval(refresh, POLL_MS);
-    return () => clearInterval(id);
-  }, []);
+    const id = setTimeout(() => refresh(filters), DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [filters]);
 
-  const filtered = useMemo(
-    () => (ipFilter.trim() ? alarms.filter((a) => (a.ip || '').includes(ipFilter.trim())) : alarms),
-    [alarms, ipFilter]
-  );
+  // Background poll picks up new alarms without disturbing current filters.
+  useEffect(() => {
+    const id = setInterval(() => refresh(filters), POLL_MS);
+    return () => clearInterval(id);
+  }, [filters]);
+
+  const hasActiveFilters = Object.values(filters).some(Boolean);
 
   return (
     <DashboardShell title="Alarmes" subtitle="Milestone XProtect · alarmes caméras par équipement">
@@ -148,22 +166,82 @@ const Alarms = () => {
               </div>
 
               <ChartCard
-                title="Historique des alarmes"
-                subtitle="Par adresse IP — filtrez pour voir les alarmes d'une caméra précise"
+                title="Filtres"
+                subtitle="Combine IP, caméra, type, statut et période — s'applique à tout l'historique, pas seulement aujourd'hui"
                 t={t}
                 className="fade-up-1"
                 action={
-                  <input
-                    value={ipFilter}
-                    onChange={(e) => setIpFilter(e.target.value)}
-                    placeholder="Filtrer par IP…"
-                    className="rounded-lg border px-3 py-1.5 text-xs"
-                    style={{ borderColor: t.border, background: t.cardSoft, color: t.inkPrimary }}
-                  />
+                  hasActiveFilters && (
+                    <button
+                      onClick={() => setFilters(EMPTY_FILTERS)}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-semibold"
+                      style={{ background: t.seriesTrack, color: t.inkSecondary }}
+                    >
+                      <FontAwesomeIcon icon={faFilterCircleXmark} className="text-[10px]" />
+                      Réinitialiser
+                    </button>
+                  )
                 }
               >
-                {filtered.length === 0 ? (
-                  <p className="text-sm" style={{ color: t.inkMuted }}>Aucune alarme.</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-6">
+                  <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
+                    Adresse IP
+                    <input
+                      value={filters.ip}
+                      onChange={setFilter('ip')}
+                      placeholder="10.136.115.…"
+                      className="rounded-lg border px-3 py-1.5 text-sm"
+                      style={inputStyle(t)}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
+                    Caméra
+                    <input
+                      value={filters.camera}
+                      onChange={setFilter('camera')}
+                      placeholder="Camera 05…"
+                      className="rounded-lg border px-3 py-1.5 text-sm"
+                      style={inputStyle(t)}
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
+                    Type d'alarme
+                    <select value={filters.alarm_type} onChange={setFilter('alarm_type')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)}>
+                      <option value="">Tous</option>
+                      {meta.alarm_types.map((type) => <option key={type} value={type}>{type}</option>)}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
+                    Statut
+                    <select value={filters.state} onChange={setFilter('state')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)}>
+                      <option value="">Tous</option>
+                      {meta.states.map((state) => <option key={state} value={state}>{state}</option>)}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
+                    Du
+                    <input type="datetime-local" value={filters.from} onChange={setFilter('from')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)} />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs" style={{ color: t.inkMuted }}>
+                    Au
+                    <input type="datetime-local" value={filters.to} onChange={setFilter('to')} className="rounded-lg border px-3 py-1.5 text-sm" style={inputStyle(t)} />
+                  </label>
+                </div>
+              </ChartCard>
+
+              <ChartCard
+                title="Historique des alarmes"
+                subtitle={`${alarms.length} résultat${alarms.length > 1 ? 's' : ''}`}
+                t={t}
+                className="fade-up-2"
+              >
+                {alarms.length === 0 ? (
+                  <p className="text-sm" style={{ color: t.inkMuted }}>Aucune alarme pour ces filtres.</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
@@ -180,8 +258,8 @@ const Alarms = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {filtered.map((alarm) => (
-                          <AlarmRow key={alarm.id} alarm={alarm} t={t} onAck={refresh} />
+                        {alarms.map((alarm) => (
+                          <AlarmRow key={alarm.id} alarm={alarm} t={t} onAck={() => refresh(filters)} />
                         ))}
                       </tbody>
                     </table>
