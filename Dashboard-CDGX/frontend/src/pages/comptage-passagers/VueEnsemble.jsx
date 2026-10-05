@@ -18,6 +18,9 @@ import StatTile from '../../components/dashboard/StatTile';
 
 const INSTANCES_POLL_MS = 3000;
 const TRAIN_POLL_MS = 2000;
+// Direct to the Jetson's mqtt_minimal.py viewer — bypasses tx2/backend for
+// this one card. Requires CORS enabled on that FastAPI app (allow_origins=["*"]).
+const MQTT_API_URL = 'http://10.136.115.100:8001';
 
 const authHeaders = () => {
   const token = localStorage.getItem('token');
@@ -117,9 +120,9 @@ const VueEnsemble = () => {
 
   const refreshTrainState = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/comptage-passagers/train-state`);
+      const res = await fetch(`${MQTT_API_URL}/state`);
       const json = await res.json();
-      setTrainState(json.success ? json.data : null);
+      setTrainState(json);
     } catch {
       setTrainState(null);
     }
@@ -146,7 +149,10 @@ const VueEnsemble = () => {
   );
   const camerasOnline = instances.filter((i) => i.status === 'running').length;
 
-  const countingShouldBeActive = trainState ? Boolean(trainState.in_station) && Boolean(trainState.cab_active) : null;
+  const ts = trainState?.train_state ?? {};
+  const topo = trainState?.topology ?? {};
+  const hasTrainData = trainState && (trainState.train_state || trainState.topology);
+  const countingShouldBeActive = trainState ? Boolean(trainState.counting_active) : null;
 
   return (
     <DashboardShell title="Vue d'ensemble" subtitle="Comptage passagers · synthèse globale">
@@ -186,11 +192,11 @@ const VueEnsemble = () => {
               {/* Train state banner — FR-001: counting active iff in_station && cab_active */}
               <ChartCard
                 title="État train"
-                subtitle="Source : bridge.py — TCMS (vitesse/cabine) + AVMS (position/trajet)"
+                subtitle="Source : MQTT MDR-6 (10.136.115.96) via le Jetson"
                 t={t}
                 className="fade-up-1"
               >
-                {!trainState ? (
+                {!hasTrainData ? (
                   <p className="text-sm" style={{ color: t.inkMuted }}>
                     Aucune donnée train reçue pour l'instant.
                   </p>
@@ -207,16 +213,16 @@ const VueEnsemble = () => {
                       Comptage {countingShouldBeActive ? 'ACTIF' : 'inactif'} (règle FR-001)
                     </span>
                     <span className="text-sm" style={{ color: t.inkSecondary }}>
-                      Station : <strong style={{ color: t.inkPrimary }}>{trainState.station_label ?? '—'}</strong>
+                      Station : <strong style={{ color: t.inkPrimary }}>{topo.stop_label ?? '—'}</strong>
                     </span>
                     <span className="text-sm" style={{ color: t.inkSecondary }}>
-                      Destination : <strong style={{ color: t.inkPrimary }}>{trainState.destination_label ?? '—'}</strong>
+                      Destination : <strong style={{ color: t.inkPrimary }}>{topo.destination_label ?? '—'}</strong>
                     </span>
                     <span className="text-sm" style={{ color: t.inkSecondary }}>
-                      Vitesse : <strong style={{ color: t.inkPrimary }}>{trainState.speed_kmh != null ? `${Number(trainState.speed_kmh).toFixed(1)} km/h` : '—'}</strong>
+                      Vitesse : <strong style={{ color: t.inkPrimary }}>{ts.speed_kmh != null ? `${Number(ts.speed_kmh).toFixed(1)} km/h` : '—'}</strong>
                     </span>
                     <span className="text-sm" style={{ color: t.inkSecondary }}>
-                      Cabine active : <strong style={{ color: t.inkPrimary }}>{trainState.cab_active ? trainState.active_cab_id : 'non'}</strong>
+                      Cabine active : <strong style={{ color: t.inkPrimary }}>{ts.cab_active ? ts.active_cab_id : 'non'}</strong>
                     </span>
                   </div>
                 )}

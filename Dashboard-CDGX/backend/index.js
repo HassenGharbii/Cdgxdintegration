@@ -567,6 +567,44 @@ app.get('/api/alarms/by-ip/:ip', async (req, res) => {
   }
 });
 
+// Ingest for train/{train_id}/event/alarm via mqtt_bridge.py — TCMS BA/KSA/SOS
+// alarm buttons, a different domain from the Milestone camera alarms above,
+// but reuses the same table/dashboard page (no ip/camera involved, so those
+// columns stay null; vehicle_zone stands in for camera_name).
+app.post('/api/alarms/tcms', async (req, res) => {
+  const { train_id, alarm_source_id, alarm_type, alarm_state, tcms_signal_name, vehicle_zone, timestamp_utc } = req.body;
+  if (!train_id || !alarm_source_id) {
+    return res.status(400).json({ success: false, error: 'Champs requis: train_id, alarm_source_id' });
+  }
+
+  try {
+    const result = await pool.query(
+      `INSERT INTO camera_alarms
+          (source_alarm_id, ip, camera_name, alarm_type, message, priority, state, triggered_at, raw)
+       VALUES
+          ($1, NULL, $2, $3, $4, 'Critique', $5, $6, $7)
+       ON CONFLICT (source_alarm_id) DO UPDATE SET
+          state = EXCLUDED.state,
+          message = EXCLUDED.message,
+          raw = EXCLUDED.raw
+       RETURNING *`,
+      [
+        `tcms:${train_id}:${alarm_source_id}`,
+        vehicle_zone || null,
+        alarm_type || null,
+        `${alarm_type || 'Alarme'} — ${tcms_signal_name || alarm_source_id}`,
+        alarm_state ? 'New' : 'Closed',
+        timestamp_utc ? new Date(timestamp_utc) : new Date(),
+        req.body,
+      ]
+    );
+    res.json({ success: true, data: result.rows[0] });
+  } catch (err) {
+    logger.error({ err });
+    res.status(500).json({ success: false, error: 'Erreur serveur' });
+  }
+});
+
 app.post('/api/alarms/:id/ack', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
